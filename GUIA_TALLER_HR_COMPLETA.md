@@ -939,492 +939,70 @@ SELECT * FROM mv_salarios_depto_ciudad ORDER BY department_name, city;
 
 ## 5.2 Preguntas prácticas (que te pueden pedir en vivo)
 
-> ⚠️ **ESTA ES LA SECCIÓN CLAVE DE LA EXPOSICIÓN**
-> El profesor probablemente te pedirá que escribas consultas en vivo.
-> Aquí tienes TODAS las posibles preguntas organizadas por categoría.
-
----
-
-### 📂 BLOQUE 1: CONSULTAS BÁSICAS (SELECT)
-
-#### P: "Muéstrame todos los empleados"
+### P: "Muéstrame todos los empleados del departamento IT"
 ```sql
-SELECT * FROM employees;
-```
-> **Qué espera el profesor:** Que sepas que `SELECT *` trae todas las columnas.
-> **Variante:** "Sin mostrar todo, solo nombres y salarios" → `SELECT first_name, last_name, salary FROM employees;`
-
-#### P: "Ordena los empleados por salario de mayor a menor"
-```sql
-SELECT first_name, last_name, salary
-FROM employees
-ORDER BY salary DESC;
-```
-> **Explica:** `ORDER BY` ordena los resultados. `DESC` es descendente, `ASC` (por defecto) es ascendente.
-
-#### P: "Filtra los empleados que ganan más de $10,000"
-```sql
-SELECT first_name, last_name, salary
-FROM employees
-WHERE salary > 10000
-ORDER BY salary DESC;
-```
-> **Explica:** `WHERE` filtra filas antes de mostrarlas. Los operadores: `>`, `<`, `>=`, `<=`, `=`, `<>` (distinto).
-
-#### P: "Muestra los empleados que se llaman Alexander"
-```sql
-SELECT * FROM employees WHERE first_name = 'Alexander';
-```
-> **Ojo con las comillas:** Los textos van entre comillas simples `'Alexander'`, los números no.
-
-#### P: "Empleados cuyo nombre empiece con A"
-```sql
-SELECT * FROM employees WHERE first_name LIKE 'A%';
-```
-> **Explica:** `LIKE` con `%` (cualquier texto) y `_` (un carácter). `'A%'` = empieza con A. `'%son'` = termina en "son".
-
-#### P: "Empleados contratados entre 2005 y 2006"
-```sql
-SELECT first_name, last_name, hire_date
-FROM employees
-WHERE hire_date BETWEEN '2005-01-01' AND '2006-12-31'
-ORDER BY hire_date;
-```
-> **Explica:** `BETWEEN` es inclusivo. También se puede hacer con `>=` y `<=`.
-
-#### P: "Empleados que NO tienen comisión"
-```sql
-SELECT first_name, last_name, commission_pct
-FROM employees
-WHERE commission_pct IS NULL;
-```
-> **⚠️ TRAMPA:** No se puede usar `= NULL`. En SQL se usa `IS NULL` porque NULL no es un valor, es la ausencia de valor.
-
----
-
-### 📂 BLOQUE 2: JOINS (EL MÁS IMPORTANTE)
-
-#### P: "Une empleados con sus departamentos"
-```sql
-SELECT e.first_name, e.last_name, d.department_name
-FROM employees e
-INNER JOIN departments d ON e.department_id = d.department_id;
-```
-> **Explica:** `INNER JOIN` solo muestra los que tienen departamento asignado. Usamos alias `e` y `d`.
-
-#### P: "Muestra todos los departamentos aunque no tengan empleados"
-```sql
-SELECT d.department_name, e.first_name, e.last_name
-FROM departments d
-LEFT JOIN employees e ON d.department_id = e.department_id
-ORDER BY d.department_name;
-```
-> **Explica:** `LEFT JOIN` = todo de la izquierda (departments) + coincidencias de la derecha (employees). Donde no hay empleado, sale `NULL`.
-
-#### P: "¿Qué departamentos NO tienen empleados?" (clásico)
-```sql
-SELECT d.department_id, d.department_name
-FROM departments d
-LEFT JOIN employees e ON d.department_id = e.department_id
-WHERE e.employee_id IS NULL;
-```
-> **Explica el truco:** LEFT JOIN + `WHERE ... IS NULL` = encuentra los que NO están en la otra tabla. Así se emula EXCEPT/MINUS.
-
-#### P: "Une 5 tablas: empleado, departamento, ubicación, país y región"
-```sql
-SELECT e.first_name, e.last_name, d.department_name,
-       l.city, c.country_name, r.region_name
-FROM employees e
+SELECT e.* FROM employees e
 JOIN departments d ON e.department_id = d.department_id
-JOIN locations l ON d.location_id = l.location_id
-JOIN countries c ON l.country_id = c.country_id
-JOIN regions r ON c.region_id = r.region_id;
+WHERE d.department_name = 'IT';
 ```
-> **Qué espera:** Que sepas encadenar JOINs siguiendo las FK. Es importante el orden lógico.
 
-#### P: "Muestra los empleados con su jefe (SELF JOIN)"
+### P: "¿Cuántos empleados hay por cada cargo?"
 ```sql
-SELECT CONCAT(e.first_name, ' ', e.last_name) AS empleado,
-       CONCAT(m.first_name, ' ', m.last_name) AS jefe
+SELECT j.job_title, COUNT(*) AS total
 FROM employees e
-LEFT JOIN employees m ON e.manager_id = m.employee_id;
+JOIN jobs j ON e.job_id = j.job_id
+GROUP BY j.job_title
+ORDER BY total DESC;
 ```
-> **Explica:** SELF JOIN = una tabla se une consigo misma. Necesitas ALIAS diferentes (`e` y `m`).
 
-#### P: "¿Cuántos empleados tiene cada jefe?"
+### P: "¿Qué empleados ganan más que su jefe?"
 ```sql
-SELECT CONCAT(m.first_name, ' ', m.last_name) AS jefe,
-       COUNT(e.employee_id) AS empleados_a_cargo
-FROM employees m
-JOIN employees e ON e.manager_id = m.employee_id
-GROUP BY m.employee_id, m.first_name, m.last_name
-ORDER BY empleados_a_cargo DESC;
-```
-> **Explica:** SELF JOIN + `GROUP BY` + `COUNT`. Agrupamos por jefe y contamos empleados.
-
-#### P: "Combina nombres de empleados y departamentos en una sola lista"
-```sql
-SELECT CONCAT(first_name, ' ', last_name) AS nombre FROM employees
-UNION
-SELECT department_name FROM departments;
-```
-> **Explica:** `UNION` combina resultados de dos consultas. `UNION ALL` conserva duplicados.
-
-#### P: "Producto cartesiano entre jobs y departments"
-```sql
-SELECT j.job_title, d.department_name
-FROM jobs j
-CROSS JOIN departments d;
-```
-> **Explica:** `CROSS JOIN` = cada job con cada department. 19 × 27 = 513 filas. Sirve para generar combinaciones.
-
----
-
-### 📂 BLOQUE 3: SUBCONSULTAS
-
-#### P: "Empleados que ganan más que el promedio"
-```sql
-SELECT first_name, last_name, salary
-FROM employees
-WHERE salary > (SELECT AVG(salary) FROM employees);
-```
-> **Explica:** La subconsulta `(SELECT AVG(salary) FROM employees)` se ejecuta PRIMERO, devuelve un número (~7,741), y luego se compara.
-
-#### P: "El empleado que más gana"
-```sql
-SELECT first_name, last_name, salary
-FROM employees
-WHERE salary = (SELECT MAX(salary) FROM employees);
-```
-> **Resultado:** Steven King con $24,000.
-
-#### P: "Departamentos que tienen empleados (EXISTS)"
-```sql
-SELECT d.department_id, d.department_name
-FROM departments d
-WHERE EXISTS (SELECT 1 FROM employees e WHERE e.department_id = d.department_id);
-```
-> **Explica:** `EXISTS` es verdadero si la subconsulta devuelve AL MENOS una fila. Es más eficiente que `IN` para listas grandes.
-
-#### P: "Diferencia entre ANY y ALL (pregunta teórica con ejemplo)"
-```sql
--- ANY: mayor que AL MENOS UNO del depto 60
-SELECT first_name, salary FROM employees
-WHERE salary > ANY (SELECT salary FROM employees WHERE department_id = 60);
-
--- ALL: mayor que TODOS del depto 60
-SELECT first_name, salary FROM employees
-WHERE salary > ALL (SELECT salary FROM employees WHERE department_id = 60);
-```
-> **Explica:** `> ANY` equivale a `> MIN(...)`. `> ALL` equivale a `> MAX(...)`.
-
-#### P: "Empleados que ganan más que el promedio de SU departamento (correlacionada)"
-```sql
-SELECT e.first_name, e.last_name, e.salary, e.department_id
+SELECT CONCAT(e.first_name, ' ', e.last_name) AS empleado, e.salary,
+       CONCAT(m.first_name, ' ', m.last_name) AS jefe, m.salary
 FROM employees e
-WHERE e.salary > (SELECT AVG(e2.salary) FROM employees e2
-                  WHERE e2.department_id = e.department_id);
-```
-> **Explica:** Esta es una SUBCONSULTA CORRELACIONADA. Se ejecuta para CADA fila de la consulta externa. Es más lenta pero más poderosa.
-
----
-
-### 📂 BLOQUE 4: FUNCIONES DE AGREGACIÓN Y GROUP BY
-
-#### P: "¿Cuántos empleados hay en total?"
-```sql
-SELECT COUNT(*) AS total FROM employees;
-```
-> **Resultado:** 107.
-
-#### P: "¿Cuál es el salario promedio?"
-```sql
-SELECT ROUND(AVG(salary), 2) AS promedio FROM employees;
+JOIN employees m ON e.manager_id = m.employee_id
+WHERE e.salary > m.salary;
 ```
 
-#### P: "¿Cuántos empleados hay por departamento?"
+### P: "¿Cuál es el salario promedio por ciudad?"
 ```sql
-SELECT department_id, COUNT(*) AS cantidad
-FROM employees
-WHERE department_id IS NOT NULL
-GROUP BY department_id
-ORDER BY cantidad DESC;
-```
-
-#### P: "¿Qué departamentos tienen más de 5 empleados?"
-```sql
-SELECT department_id, COUNT(*) AS cantidad
-FROM employees
-GROUP BY department_id
-HAVING COUNT(*) > 5
-ORDER BY cantidad DESC;
-```
-> **Explica la diferencia:** `WHERE` filtra ANTES de agrupar. `HAVING` filtra DESPUÉS de agrupar.
-
-#### P: "¿Cuál es el gasto total en salarios por departamento?"
-```sql
-SELECT d.department_name, SUM(e.salary) AS gasto_total
-FROM employees e
-JOIN departments d ON e.department_id = d.department_id
-GROUP BY d.department_name
-ORDER BY gasto_total DESC;
-```
-> **¿Quién gasta más?** Shipping (depto 50) con ~$147,000.
-
-#### P: "Top 5 de empleados con mayor salario"
-```sql
-SELECT employee_id, CONCAT(first_name, ' ', last_name) AS empleado, salary
-FROM employees
-ORDER BY salary DESC, employee_id
-LIMIT 5;
-```
-> **Los 5:** Steven King ($24K), Neena Kochhar ($17K), Lex De Haan ($17K), John Russell ($14K), Karen Partners ($13.5K).
-
----
-
-### 📂 BLOQUE 5: CTE Y TABLAS DERIVADAS
-
-#### P: "Usa una CTE para calcular algo"
-```sql
-WITH salarios_altos AS (
-  SELECT first_name, last_name, salary
-  FROM employees
-  WHERE salary > 10000
-)
-SELECT * FROM salarios_altos ORDER BY salary DESC;
-```
-> **Explica:** CTE = Common Table Expression. Se define con `WITH nombre AS (...)`. Es como una tabla temporal que solo vive en esa consulta. Más legible que una subconsulta.
-
-#### P: "Usa ROW_NUMBER() para rankear empleados por salario"
-```sql
-SELECT first_name, last_name, salary,
-       ROW_NUMBER() OVER (ORDER BY salary DESC) AS ranking
-FROM employees;
-```
-> **Explica:** `ROW_NUMBER()` numera filas. `OVER (ORDER BY ...)` define el orden. `PARTITION BY` reinicia el contador por grupo.
-
-#### P: "Ranking salarial dentro de cada departamento"
-```sql
-SELECT department_id, first_name, last_name, salary,
-       ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) AS ranking
-FROM employees
-WHERE department_id IS NOT NULL;
-```
-> **Explica:** `PARTITION BY` reinicia el contador en cada departamento. Es como un "GROUP BY para ventanas".
-
----
-
-### 📂 BLOQUE 6: DDL Y DML (CREAR, MODIFICAR, ELIMINAR)
-
-#### P: "Crea una tabla nueva"
-```sql
-CREATE TABLE ejemplo (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  nombre VARCHAR(50) NOT NULL,
-  fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-> **Explica:** Tipos de datos: `INT`, `VARCHAR(n)`, `DATE`, `DECIMAL`, `TIMESTAMP`. Restricciones: `PRIMARY KEY`, `NOT NULL`, `UNIQUE`, `DEFAULT`.
-
-#### P: "Agrega una columna a una tabla existente"
-```sql
-ALTER TABLE employees ADD COLUMN fecha_nacimiento DATE;
-```
-> **Explica:** `ALTER TABLE` modifica la estructura. Se puede `ADD`, `DROP`, `MODIFY` columnas.
-
-#### P: "Modifica el salario de un empleado"
-```sql
-UPDATE employees SET salary = 26000 WHERE employee_id = 100;
-```
-> **⚠️ PELIGRO:** Siempre usar `WHERE` en UPDATE, si no, cambia TODAS las filas.
-```sql
--- Verificar antes
-SELECT salary FROM employees WHERE employee_id = 100;
-```
-
-#### P: "Elimina un empleado"
-```sql
-DELETE FROM employees WHERE employee_id = 207;
-```
-> **Explica:** `DELETE` elimina filas, `TRUNCATE` elimina todas y reinicia AUTO_INCREMENT.
-
-#### P: "¿Qué pasa si intento eliminar un departamento que tiene empleados?"
-```sql
-DELETE FROM departments WHERE department_id = 60;
--- ERROR 1451: Cannot delete or update a parent row (FK constraint)
-```
-> **Explica:** MySQL bloquea la operación por la FK. Hay que eliminar primero los empleados o usar `ON DELETE CASCADE` (que no tenemos).
-
----
-
-### 📂 BLOQUE 7: OPTIMIZACIÓN (EXPLAIN E ÍNDICES)
-
-#### P: "Muestra cómo EXPLAIN ayuda a optimizar"
-```sql
-EXPLAIN SELECT * FROM employees WHERE salary > 10000;
-```
-> **Qué mostrar:** La columna `type` = ALL (full table scan) y `rows` = 107 (examina todas las filas).
-
-#### P: "Crea un índice y demuestra la mejora"
-```sql
--- Paso 1: EXPLAIN antes
-EXPLAIN SELECT * FROM employees WHERE salary > 10000;
--- type: ALL, rows: 107
-
--- Paso 2: Crear índice
-CREATE INDEX idx_salary_demo ON employees(salary);
-
--- Paso 3: EXPLAIN después (cambia el plan)
-EXPLAIN SELECT * FROM employees WHERE salary > 10000;
--- type: range, rows: ~35 (mucho menos!)
-```
-> **Explica la mejora:** Antes: leía TODAS las filas (107). Después: busca solo las que cumplen (~35). El `type` cambió de `ALL` a `range`.
-
-#### P: "¿Qué columnas deberían tener índice?"
-```sql
--- Columnas críticas para indexar (ya las creamos)
-CREATE INDEX idx_hire_date ON employees(hire_date);
-CREATE INDEX idx_salary ON employees(salary);
-CREATE INDEX idx_commission ON employees(commission_pct);
-```
-> **Explica:** Índices en columnas usadas en `WHERE`, `JOIN`, `ORDER BY`. No crear en columnas que se actualizan mucho.
-
-#### P: "Muestra los índices de una tabla"
-```sql
-SHOW INDEX FROM employees;
-```
-> **Qué mostrar:** `Key_name`, `Column_name`, `Non_unique` (0 = único/PK, 1 = no único), `Index_type` (BTREE).
-
----
-
-### 📂 BLOQUE 8: PREGUNTAS TRAMPA EN VIVO
-
-#### ⚠️ TRAMPA: "¿Cuántos registros tiene employees?"
-```sql
-SELECT COUNT(*) FROM employees;         -- 107
-SELECT COUNT(commission_pct) FROM employees; -- 35 (COUNT ignora NULLs)
-```
-
-#### ⚠️ TRAMPA: "¿Por qué esta consulta da error?"
-```sql
-SELECT first_name, COUNT(*) FROM employees;
--- ERROR: not in GROUP BY
-```
-> **Solución:** Toda columna sin agregación debe estar en GROUP BY:
-```sql
-SELECT first_name, COUNT(*) FROM employees GROUP BY first_name;
-```
-
-#### ⚠️ TRAMPA: "Actualiza el salario de un empleado pero... ¡se te olvidó el WHERE!"
-> **Qué pasa:** Se actualizan TODOS los empleados. Siempre verificar con SELECT antes de UPDATE/DELETE.
-
-#### ⚠️ TRAMPA: "¿Por qué `WHERE commission_pct = NULL` no funciona?"
-> **Respuesta:** NULL no es un valor, es la ausencia de valor. Se usa `IS NULL` o `IS NOT NULL`.
-
-#### ⚠️ TRAMPA: "¿Cuál es la diferencia entre DELETE y TRUNCATE?"
-> DELETE = fila por fila, respeta triggers, se puede deshacer (ROLLBACK), acepta WHERE.
-> TRUNCATE = todo de golpe, no respeta triggers, no acepta WHERE, reinicia AUTO_INCREMENT, más rápido.
-
-#### ⚠️ TRAMPA: "¿Qué es más rápido, JOIN o subconsulta?"
-> Generalmente JOIN es más rápido, especialmente si hay índices. El optimizador de MySQL maneja mejor los JOINs.
-
----
-
-### 📂 BLOQUE 9: PREGUNTAS DEL DÍA A DÍA (ESCENARIOS REALES)
-
-#### P: "Necesito saber cuánto gasta la empresa en salarios por ciudad"
-```sql
-SELECT l.city, ROUND(SUM(e.salary), 2) AS gasto_total,
-       COUNT(e.employee_id) AS empleados
+SELECT l.city, ROUND(AVG(e.salary), 2) AS promedio
 FROM employees e
 JOIN departments d ON e.department_id = d.department_id
 JOIN locations l ON d.location_id = l.location_id
 GROUP BY l.city
-ORDER BY gasto_total DESC;
+ORDER BY promedio DESC;
 ```
 
-#### P: "¿Qué cargos tienen salario promedio mayor a $8,000?"
+### P: "Agrega un nuevo empleado"
 ```sql
-SELECT j.job_title, ROUND(AVG(e.salary), 2) AS salario_promedio
-FROM employees e
-JOIN jobs j ON e.job_id = j.job_id
-GROUP BY j.job_title
-HAVING AVG(e.salary) > 8000
-ORDER BY salario_promedio DESC;
+INSERT INTO employees (employee_id, first_name, last_name, email, phone_number,
+                       hire_date, job_id, salary, manager_id, department_id)
+VALUES (207, 'Juan', 'Perez', 'JPEREZ', '555.123.4567',
+        CURDATE(), 'IT_PROG', 7500, 103, 60);
 ```
 
-#### P: "Calcula los años de experiencia de cada empleado"
+### P: "Crea un índice y muestra cómo mejora la consulta"
 ```sql
-SELECT first_name, last_name, hire_date,
-       TIMESTAMPDIFF(YEAR, hire_date, CURDATE()) AS anios_trabajados
-FROM employees
-ORDER BY anios_trabajados DESC;
+-- Antes del índice
+EXPLAIN SELECT * FROM employees WHERE salary > 10000;
+
+CREATE INDEX idx_salary_test ON employees(salary);
+
+-- Después del índice (el type cambiará de ALL a ref o range)
+EXPLAIN SELECT * FROM employees WHERE salary > 10000;
 ```
 
-#### P: "¿Qué empleado NO tiene jefe asignado?"
+### P: "Modifica el salario de un empleado"
 ```sql
-SELECT first_name, last_name
-FROM employees
-WHERE manager_id IS NULL;
+UPDATE employees SET salary = 26000 WHERE employee_id = 100;
+-- Verificar
+SELECT first_name, last_name, salary FROM employees WHERE employee_id = 100;
 ```
-> **Respuesta:** Solo Steven King (el presidente).
 
-#### P: "¿Cuántos empleados hay por región?"
+### P: "Elimina un empleado (si no tiene restricciones)"
 ```sql
-SELECT r.region_name, COUNT(*) AS total_empleados
-FROM employees e
-JOIN departments d ON e.department_id = d.department_id
-JOIN locations l ON d.location_id = l.location_id
-JOIN countries c ON l.country_id = c.country_id
-JOIN regions r ON c.region_id = r.region_id
-GROUP BY r.region_name
-ORDER BY total_empleados DESC;
-```
-
-#### P: "¿Qué países tienen más empleados?"
-```sql
-SELECT c.country_name, COUNT(*) AS total
-FROM employees e
-JOIN departments d ON e.department_id = d.department_id
-JOIN locations l ON d.location_id = l.location_id
-JOIN countries c ON l.country_id = c.country_id
-GROUP BY c.country_name
-ORDER BY total DESC;
-```
-
----
-
-### 📂 BLOQUE 10: VARIACIONES QUE TE PUEDEN PEDIR
-
-#### "En lugar de X hazlo con Y"
-
-| Si el profesor dice... | En vez de... | Haz... |
-|------------------------|-------------|-------|
-| "Hazlo con RIGHT JOIN" | `A LEFT JOIN B` | `B RIGHT JOIN A` |
-| "Hazlo con subconsulta" | `JOIN` | `WHERE col IN (SELECT...)` |
-| "Hazlo sin JOIN" | `SELECT ... JOIN` | `SELECT ... WHERE col IN (SELECT ...)` |
-| "Hazlo con CTE" | Subconsulta en FROM | `WITH cte AS (...) SELECT ...` |
-| "Sin GROUP BY" | `GROUP BY col` | `SELECT DISTINCT col, ...` (no siempre funciona) |
-| "Con EXISTS en vez de IN" | `WHERE id IN (...)` | `WHERE EXISTS (SELECT 1 ...)` |
-
----
-
-### 💡 RESUMEN: LO QUE MÁS REPITE EL PROFESOR
-
-| # | Pregunta | Tema |
-|---|----------|------|
-| 1 | "Empleados con su departamento" | INNER JOIN |
-| 2 | "Departamentos sin empleados" | LEFT JOIN + IS NULL |
-| 3 | "Empleados con su jefe" | SELF JOIN |
-| 4 | "Empleados que ganan más que el promedio" | Subconsulta escalar |
-| 5 | "Empleados por departamento" | GROUP BY + COUNT |
-| 6 | "Departamentos con más de 5 empleados" | HAVING |
-| 7 | "¿Cómo optimizarías esta consulta?" | EXPLAIN + índices |
-| 8 | "Diferencia entre WHERE y HAVING" | Teórica |
-| 9 | "Diferencia entre LEFT JOIN e INNER JOIN" | Teórica |
-| 10 | "Crea un índice y muestra el antes/después" | Optimización |
-| 11 | "¿Por qué COUNT(columna) da distinto que COUNT(*)" | NULLs |
-| 12 | "Usa una CTE" | WITH |
+DELETE FROM employees WHERE employee_id = 207;
 ```
 
 ---
