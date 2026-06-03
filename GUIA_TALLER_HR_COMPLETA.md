@@ -18,6 +18,14 @@ Puerto: 3307 | Usuario: root | Password: 9312
 5. [POSIBLES PREGUNTAS DEL PROFESOR](#5-posibles-preguntas-del-profesor)
 6. [COMANDOS RÁPIDOS PARA LA EXPOSICIÓN](#6-comandos-rápidos-para-la-exposición)
 
+**📎 ANEXOS**
+- [ANEXO A - Tutorial: Cómo desarrollar cualquier consulta en 5 pasos](#anexo-a---tutorial-cómo-desarrollar-cualquier-consulta-en-5-pasos)
+- [ANEXO B - Montaje de la BD desde cero (Manual + DBeaver)](#anexo-b---montaje-de-la-base-de-datos-desde-cero)
+- [ANEXO C - Conexión y uso con DBeaver](#anexo-c---conexión-y-uso-con-dbeaver)
+- [ANEXO D - Preguntas avanzadas del profesor](#anexo-d---preguntas-avanzadas-del-profesor-y-respuestas)
+- [ANEXO E - Mini-tutoriales rápidos](#anexo-e---mini-tutoriales-rápidos)
+- [ANEXO F - Checklist para la exposición](#anexo-f---checklist-para-la-exposición)
+
 ---
 
 # 1. ESTRUCTURA DE LA BASE DE DATOS HR
@@ -1157,12 +1165,27 @@ ORDER BY e.salary DESC;
 
 ---
 
-## ANEXO B - MIGRACIÓN Y MONTAJE DE LA BASE DE DATOS
+## ANEXO B - MONTAJE DE LA BASE DE DATOS DESDE CERO
 
 ### B.1 ¿Qué significa "montar la base de datos"?
-Es el proceso de crear la base de datos desde cero: ejecutar los scripts SQL que crean las tablas, insertan los datos y configuran las relaciones.
+Es el proceso de crear la base de datos `hr` desde cero: crear la base de datos, ejecutar los scripts SQL que crean las 7 tablas, insertar los registros y configurar las vistas, procedimientos y triggers.
 
-### B.2 Archivos del modelo HR
+### B.2 Requisitos previos
+
+| Requisito | Verificación |
+|-----------|-------------|
+| MySQL 8.0 instalado | `Get-Service MySQL80` (debe aparecer como Running) |
+| Puerto 3307 disponible | `netstat -an | findstr 3307` |
+| Scripts del modelo HR | Carpeta `base_datos/modelo_HR/` con los 4 archivos |
+| Credenciales root | Usuario: `root`, Contraseña: `9312` |
+
+Si MySQL no está corriendo:
+```powershell
+net start MySQL80
+```
+
+### B.3 Archivos del modelo HR
+
 Los scripts originales están en `base_datos/modelo_HR/`:
 
 | Archivo | Contenido |
@@ -1177,40 +1200,250 @@ Los scripts originales están en `base_datos/modelo_HR/`:
 > **Posible pregunta:** *¿Qué pasa si ejecuto 2_Tablas.sql antes de 1_usuario.sql?*
 > **Respuesta:** Falla porque la base de datos `hr` no existe todavía.
 
-### B.3 Método 1: Con MySQL CLI (recomendado para exponer)
+---
 
-```sql
-mysql> SOURCE ruta/completa/1_usuario.sql;
-mysql> SOURCE ruta/completa/2_Tablas.sql;
-mysql> SOURCE ruta/completa/3_datos.sql;
-mysql> SOURCE ruta/completa/4_otros.sql;
-```
+### B.4 MÉTODO MANUAL: Montar la BD desde 0 paso a paso (MySQL CLI)
 
-O desde PowerShell:
+Este método usa la consola de MySQL (`mysql.exe`) y es el **recomendado para la exposición** porque muestra cada paso en tiempo real.
+
+#### Paso 1: Abrir la terminal MySQL como root
+
 ```powershell
-& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p9312 -h localhost -P 3307 < "ruta\1_usuario.sql"
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p9312 -h localhost -P 3307
 ```
 
-### B.4 Verificar que la BD está montada
+> **Qué ve el profesor:** La línea de comandos cambia a `mysql>` indicando que estamos dentro del motor de base de datos.
+
+#### Paso 2: Verificar el estado inicial (opcional pero impactante)
+
+Mostrar que NO existe la base de datos `hr`:
 
 ```sql
-USE hr;
-SHOW TABLES;           -- 7 tablas
-SELECT COUNT(*) FROM employees;   -- 107
-SELECT COUNT(*) FROM departments; -- 27
+mysql> SHOW DATABASES;
 ```
+
+> **Resultado:** Se ve una lista de BDs del sistema (`mysql`, `performance_schema`, `sys`, etc.) pero **no aparece `hr`**.
+
+#### Paso 3: Ejecutar `1_usuario.sql` - Crear la BD y el usuario
+
+Desde el prompt de MySQL:
+
+```sql
+mysql> SOURCE C:/ruta/completa/hacia/1_usuario.sql;
+```
+
+**O desde PowerShell (sin entrar a MySQL):**
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p9312 -h localhost -P 3307 < "C:\ruta\completa\1_usuario.sql"
+```
+
+> **¿Qué hace este script?**
+> 1. `DROP DATABASE IF EXISTS hr;` — Elimina la BD si ya existe (empieza limpio)
+> 2. `CREATE DATABASE hr...` — Crea la base de datos con charset utf8mb4
+> 3. `CREATE USER 'hr'@'localhost'...` — Crea el usuario `hr` con contraseña `hrpass`
+> 4. `GRANT ALL PRIVILEGES ON hr.*...` — Da acceso total al usuario `hr` sobre la BD
+> 5. `FLUSH PRIVILEGES;` — Aplica los cambios
+
+**Verificar:**
+```sql
+mysql> SHOW DATABASES;
+-- Ahora `hr` debe aparecer en la lista
+```
+
+#### Paso 4: Ejecutar `2_Tablas.sql` - Crear las 7 tablas
+
+```sql
+mysql> SOURCE C:/ruta/completa/hacia/2_Tablas.sql;
+```
+
+> **¿Qué hace este script?**
+> 1. `USE hr;` — Selecciona la base de datos
+> 2. `SET FOREIGN_KEY_CHECKS = 0;` — Desactiva validación de FKs temporalmente
+> 3. Elimina tablas existentes (en orden inverso de dependencias)
+> 4. Crea las 7 tablas con sus columnas, tipos de datos, PKs, FKs e índices
+> 5. `SET FOREIGN_KEY_CHECKS = 1;` — Reactiva validación
+
+**Verificar:**
+```sql
+mysql> USE hr;
+mysql> SHOW TABLES;
+```
+> **Resultado esperado:** 7 tablas:
+> `regions`, `countries`, `locations`, `departments`, `jobs`, `employees`, `job_history`
+
+#### Paso 5: Ejecutar `3_datos.sql` - Insertar los registros
+
+```sql
+mysql> SOURCE C:/ruta/completa/hacia/3_datos.sql;
+```
+
+> **¿Qué hace?** Inserta todos los datos:
+> - 4 regiones (Europe, Americas, Asia, Middle East and Africa)
+> - 25 países (US, UK, IT, JP, CA, etc.)
+> - 23 ubicaciones (Seattle, Toronto, London, Tokyo, etc.)
+> - 27 departamentos (Executive, IT, Sales, Shipping, etc.)
+> - 19 cargos (President, Programmer, Sales Manager, etc.)
+> - 107 empleados (Steven King, Neena Kochhar, etc.)
+
+**Verificar:**
+```sql
+mysql> SELECT COUNT(*) FROM employees;
+-- Debe devolver: 107
+mysql> SELECT COUNT(*) FROM departments;
+-- Debe devolver: 27
+```
+
+#### Paso 6: Ejecutar `4_otros.sql` - Vistas, procedimientos y triggers
+
+```sql
+mysql> SOURCE C:/ruta/completa/hacia/4_otros.sql;
+```
+
+> **¿Qué hace?**
+> - Crea la vista `emp_details_view` (para consultas rápidas)
+> - Crea el trigger `secure_employees` (evita DELETE en employees fuera de horario laboral)
+> - Crea el trigger `update_job_history` (inserta automáticamente en job_history cuando un empleado cambia de cargo o departamento)
+
+#### Paso 7: Verificación final
+
+```sql
+mysql> USE hr;
+mysql> SHOW TABLES;
+-- 7 tablas
+
+mysql> SELECT 'regions' AS tabla, COUNT(*) FROM regions
+    -> UNION ALL SELECT 'countries', COUNT(*) FROM countries
+    -> UNION ALL SELECT 'locations', COUNT(*) FROM locations
+    -> UNION ALL SELECT 'departments', COUNT(*) FROM departments
+    -> UNION ALL SELECT 'jobs', COUNT(*) FROM jobs
+    -> UNION ALL SELECT 'employees', COUNT(*) FROM employees;
+```
+
+| tabla | COUNT(*) |
+|-------|----------|
+| regions | 4 |
+| countries | 25 |
+| locations | 23 |
+| departments | 27 |
+| jobs | 19 |
+| employees | 107 |
+
+#### Paso 8: Salir de MySQL
+
+```sql
+mysql> EXIT;
+```
+
+---
+
+### B.5 MÉTODO DBeaver: Montar la BD desde 0 con interfaz gráfica
+
+Este método usa **DBeaver** y es ideal para mostrar al profesor una alternativa visual sin necesidad de escribir comandos.
+
+#### Paso 1: Abrir DBeaver y crear una conexión a MySQL
+
+| Paso | Acción |
+|------|--------|
+| 1 | Abrir DBeaver |
+| 2 | Click en **"New Database Connection"** (ícono ⛁ + ➕) o menú `Database → New Database Connection` |
+| 3 | Seleccionar **MySQL** de la lista de bases de datos |
+| 4 | En la ventana de configuración, llenar: |
+
+```
+Host:     localhost
+Port:     3307
+Database: (dejar en blanco — la crearemos después)
+Username: root
+Password: 9312
+```
+
+| 5 | Click en **"Test Connection"** → Si pide descargar driver, aceptar → Debe decir "Connected" |
+| 6 | Click en **"Finish"** |
+
+#### Paso 2: Crear la base de datos `hr` desde DBeaver
+
+1. En el panel izquierdo, **click derecho sobre la conexión MySQL**
+2. Seleccionar **"Create New Database"** o **"Tools → Server → Create Database"**
+3. En la ventana emergente escribir:
+   - **Database name:** `hr`
+   - **Charset:** `utf8mb4`
+   - **Collation:** `utf8mb4_unicode_ci`
+4. Click **OK**
+
+**Alternativa:** También se puede crear con una consulta SQL desde DBeaver:
+```sql
+CREATE DATABASE hr CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+#### Paso 3: Abrir y ejecutar `1_usuario.sql`
+
+1. Click en **"SQL Editor"** (ícono de hoja con lápiz) o menú `SQL Editor → New SQL Editor`
+2. Click en **"Open File"** (📂) y buscar `1_usuario.sql` en la carpeta `base_datos/modelo_HR/`
+3. **OJO:** Este script crea la BD, pero como ya la creamos manualmente, solo necesitamos ejecutar las partes del usuario. O simplemente abrir el archivo completo y ejecutarlo con `Ctrl + Enter` (las sentencias `CREATE DATABASE IF NOT EXISTS` no dan error si ya existe).
+
+#### Paso 4: Ejecutar `2_Tablas.sql`
+
+1. Click en **"Open File"** (📂) → seleccionar `2_Tablas.sql`
+2. Click en el botón **"Execute SQL Script"** (▶️) o presionar `Ctrl + Shift + E`
+3. Revisar la pestaña **"Output"** para confirmar que no hay errores
+
+> **Qué debe mostrar:** Mensajes como `Query OK`, `Table created`, etc. Sin errores.
+
+#### Paso 5: Ejecutar `3_datos.sql`
+
+1. Click en **"Open File"** (📂) → seleccionar `3_datos.sql`
+2. Click en **"Execute SQL Script"** (▶️) o `Ctrl + Shift + E`
+3. Esperar a que termine (son ~150+ INSERTs, tarda 1-2 segundos)
+
+**Verificar los datos insertados:**
+1. En el panel izquierdo, expandir `MySQL → hr → Tables`
+2. Click derecho en `employees` → **"View Data"**
+3. Deben aparecer 107 filas en la cuadrícula
+
+#### Paso 6: Ejecutar `4_otros.sql`
+
+1. Click en **"Open File"** (📂) → seleccionar `4_otros.sql`
+2. Click en **"Execute SQL Script"** (▶️) o `Ctrl + Shift + E`
+
+#### Paso 7: Refrescar y verificar
+
+1. Click derecho sobre `hr` en el panel izquierdo → **"Refresh"** (🔄)
+2. Expandir `hr → Tables` → deben aparecer las 7 tablas
+3. Click derecho en `hr` → **"View Diagram"** → muestra el diagrama ER completo
+
+> **Qué mostrarle al profesor:** El diagrama entidad-relación con las 7 tablas, sus columnas y las líneas que conectan las FKs.
+
+#### Paso 8: Probar que funciona
+
+1. Abrir un **nuevo SQL Editor**
+2. Escribir:
+```sql
+SELECT first_name, last_name, salary FROM employees WHERE salary > 10000 ORDER BY salary DESC;
+```
+3. Presionar `Ctrl + Enter`
+4. Mostrar el resultado: 9 empleados con salario > $10,000
+
+---
 
 ### B.6 Backup de la base de datos
 
-Con `mysqldump`:
+Con `mysqldump` desde PowerShell:
 ```powershell
 & "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -u root -p9312 -h localhost -P 3307 hr > hr_backup.sql
 ```
 
-### B.6 Posibles preguntas sobre migración
+**Para restaurar el backup:**
+```powershell
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p9312 -h localhost -P 3307 < hr_backup.sql
+```
+
+### B.7 Preguntas frecuentes sobre montaje
 
 **Q:** *¿Por qué se usa `SET FOREIGN_KEY_CHECKS=0` en los scripts?*
 > **R:** Para desactivar temporalmente la validación de claves foráneas mientras se crean las tablas. Así podemos crear tablas en cualquier orden sin que las FKs bloqueen el proceso. Luego se reactiva con `SET FOREIGN_KEY_CHECKS=1`.
+
+**Q:** *¿Qué pasa si ejecuto los scripts varias veces?*
+> **R:** Los scripts están diseñados para ser **idempotentes**: usan `DROP ... IF EXISTS` antes de crear, así que se pueden ejecutar múltiples veces sin errores.
 
 **Q:** *¿Qué problemas encontraron al migrar de MariaDB a MySQL 8.0?*
 > **R:** Los scripts originales eran para MariaDB. Tuvimos que:
@@ -1221,19 +1454,22 @@ Con `mysqldump`:
 **Q:** *¿Cómo verifican que todos los datos se migraron correctamente?*
 > **R:** Comparamos el conteo de registros contra los scripts originales y ejecutamos el SQL_Maestro completo (38 consultas, 0 errores).
 
+**Q:** *¿Cuál es la diferencia entre montar con CLI y con DBeaver?*
+> **R:** El CLI muestra cada comando y su resultado en texto, ideal para explicar paso a paso qué está pasando. DBeaver es más visual, muestra las tablas en cuadrícula y el diagrama ER, ideal para una vista general rápida.
+
 ---
 
-## ANEXO C - CONEXIÓN CON DBeaver
+## ANEXO C - CONEXIÓN Y USO CON DBeaver
 
 ### C.1 ¿Qué es DBeaver?
 Es una herramienta GUI gratuita para administrar bases de datos. Soporta MySQL, MariaDB, PostgreSQL, Oracle, SQL Server, etc.
 
-### C.2 Pasos para conectar DBeaver a MySQL80
+### C.2 Conectar DBeaver a MySQL80 (BD ya existente)
 
 | Paso | Acción |
 |------|--------|
 | 1 | Abrir DBeaver |
-| 2 | Click en "New Database Connection" (ícono ⛁ + ➕) o menú `Database → New Database Connection` |
+| 2 | Click en **"New Database Connection"** (ícono ⛁ + ➕) o menú `Database → New Database Connection` |
 | 3 | Seleccionar **MySQL** de la lista |
 | 4 | Llenar los datos: |
 
